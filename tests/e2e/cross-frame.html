@@ -8,5 +8,10 @@
     <p>The video lives in a cross-origin iframe below, like a Kaltura embed.</p>
     <!-- src is rewritten by the test to point at the second origin -->
     <iframe id="player" src="about:blank" width="640" height="480"></iframe>
+    <p>
+      Below: a blank iframe whose player HTML is written by this page, the way the Kaltura V2
+      (kWidget) player embeds.
+    </p>
+    <iframe id="written" name="kaltura_player_ifp" width="640" height="200"></iframe>
   </body>
 </html>

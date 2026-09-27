@@ -171,6 +171,62 @@ export default async function runCrossFrameE2ETests() {
       const state = await videoState(frame);
       assert.equal(state.rate, 3, 'iframe video rate should be 3x');
     });
+    await runTest(
+      'Blank iframe written by the parent (Kaltura V2 style) gets a controller',
+      async () => {
+        await page.evaluate(() => {
+          const frame = document.getElementById('written');
+          const doc = frame.contentWindow.document;
+          doc.open();
+          // Absolute URL: a written about:blank document has no base URL.
+          const src = new URL('fixtures/test.wav', location.href).href;
+          doc.write(
+            '<!doctype html><html><body><video controls width="320" height="180" loop muted>' +
+              `<source src="${src}" type="audio/wav"></video></body></html>`
+          );
+          doc.close();
+        });
+        const written = page.frames().find((f) => f.name() === 'kaltura_player_ifp');
+        assert.true(!!written, 'written frame should exist');
+        await written.waitForSelector('vsc-controller', { timeout: 10000 });
+        await written.waitForFunction(() => document.querySelector('video')?.readyState >= 2, {
+          timeout: 10000,
+        });
+        await written.evaluate(() => {
+          window.addEventListener(
+            'keydown',
+            (e) =>
+              console.log(
+                'DBG written keydown',
+                e.code,
+                'controlled',
+                window.VSC?.stateManager?.getControlledElements().length,
+                'init',
+                window.VSC_controller?.initialized
+              ),
+            true
+          );
+        });
+      }
+    );
+
+    await runTest('Shortcuts reach the written iframe with focus on the host page', async () => {
+      const written = page.frames().find((f) => f.name() === 'kaltura_player_ifp');
+      await page.evaluate(() => document.body.focus());
+      await page.keyboard.press('KeyR');
+      await sleep(500);
+      const rate = await written.evaluate(() => document.querySelector('video').playbackRate);
+      assert.equal(rate, 4, 'written iframe video rate should be 4x');
+    });
+
+    await runTest('Shortcuts work with focus inside the written iframe', async () => {
+      const written = page.frames().find((f) => f.name() === 'kaltura_player_ifp');
+      await written.evaluate(() => document.body.focus());
+      await page.keyboard.press('KeyW');
+      await sleep(500);
+      const rate = await written.evaluate(() => document.querySelector('video').playbackRate);
+      assert.equal(rate, 2, 'written iframe video rate should be 2x');
+    });
   } catch (error) {
     console.log(`   💥 Suite error: ${error.message}`);
     failed++;

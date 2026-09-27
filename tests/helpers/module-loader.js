@@ -12,6 +12,7 @@ export async function loadCoreModules() {
   await import('../../src/utils/constants.js');
   await import('../../src/utils/logger.js');
   await import('../../src/utils/dom-utils.js');
+  await import('../../src/utils/document-listeners.js');
   // Speed arbitration decision core — constructed by EventManager and
   // VideoController, so must be registered before either is instantiated.
   await import('../../src/core/arbiter.js');

@@ -18,11 +18,97 @@ import { matchSiteRule } from '../utils/site-pattern.js';
 const SPEED_MIN = 0.07;
 const SPEED_MAX = 16;
 
-const docEl = document.documentElement;
+/**
+ * Resolve the URL that site rules should be matched against.
+ *
+ * A normal document uses its own location. An inherited about: document
+ * (about:blank / about:srcdoc, e.g. the iframe the Kaltura V2 player writes
+ * its HTML into) has no site URL of its own, but it inherits its creator's
+ * origin, so the nearest same-origin ancestor is readable and is the real
+ * site. Returns null when no such ancestor exists (fail closed).
+ * @param {Window} win
+ * @returns {string|null}
+ */
+export function resolveSiteUrl(win) {
+  const ownHref = win.location.href;
+  if (win.location.protocol !== 'about:') {
+    return ownHref;
+  }
+  let current = win;
+  for (let depth = 0; depth < 32 && current.parent && current.parent !== current; depth++) {
+    current = current.parent;
+    let href;
+    try {
+      href = current.location.href;
+    } catch {
+      // Cross-origin ancestor: an inherited about: frame is never created
+      // by one of these, so there is nothing trustworthy left to read.
+      return null;
+    }
+    if (typeof href === 'string' && href && !/^about:/i.test(href)) {
+      return href;
+    }
+  }
+  return null;
+}
+
+/**
+ * @param {string} url
+ * @returns {string} hostname without a leading www.
+ */
+function hostnameOf(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return location.hostname.replace(/^www\./, '');
+  }
+}
+
 let bridgeInitialized = false;
 
+/**
+ * Root-element listeners that survive a document.open() rewrite. The
+ * rewrite replaces the root element and erases every listener on it, so
+ * handlers are kept here and rebound whenever the root changes. Dispatch
+ * always targets the current root for the same reason.
+ */
+const rootHandlers = [];
+let boundRoot = null;
+
+function bindRoot() {
+  const root = document.documentElement;
+  if (!root || root === boundRoot) {
+    return;
+  }
+  boundRoot = root;
+  for (const { type, handler } of rootHandlers) {
+    root.addEventListener(type, handler);
+  }
+}
+
+function onRoot(type, handler) {
+  rootHandlers.push({ type, handler });
+  if (boundRoot === document.documentElement && boundRoot) {
+    boundRoot.addEventListener(type, handler);
+  } else {
+    bindRoot();
+  }
+}
+
+function offRoot(type, handler) {
+  const idx = rootHandlers.findIndex((h) => h.type === type && h.handler === handler);
+  if (idx !== -1) {
+    rootHandlers.splice(idx, 1);
+  }
+  boundRoot?.removeEventListener(type, handler);
+}
+
+function dispatch(type, detail) {
+  document.documentElement?.dispatchEvent(new CustomEvent(type, { detail }));
+}
+
 function dispatchAbort() {
-  docEl.dispatchEvent(new CustomEvent('VSC_SETTINGS_READY', { detail: { abort: true } }));
+  dispatch('VSC_SETTINGS_READY', { abort: true });
 }
 
 function init() {
@@ -33,12 +119,8 @@ function init() {
     }
     bridgeInitialized = true;
 
-    // Inherited about: documents have no trustworthy site URL available
-    // without crossing into page context. Fail closed instead: supporting media
-    // in these rare frames is less important than honoring disabled-site rules.
-    if (location.protocol === 'about:') {
-      docEl.addEventListener('VSC_REQUEST_SETTINGS', dispatchAbort, { once: true });
-      return;
+    if (typeof MutationObserver === 'function') {
+      new MutationObserver(bindRoot).observe(document, { childList: true });
     }
 
     let disabledForDocument = false;
@@ -51,39 +133,42 @@ function init() {
       return null;
     });
 
-    docEl.addEventListener(
-      'VSC_REQUEST_SETTINGS',
-      async () => {
-        const settings = await settingsReady;
-        if (!settings) {
-          dispatchAbort();
-          return;
-        }
+    // Answer every request, not just the first: after a rewrite the page
+    // world may be injected again and ask anew.
+    onRoot('VSC_REQUEST_SETTINGS', async () => {
+      const settings = await settingsReady;
+      if (!settings) {
+        dispatchAbort();
+        return;
+      }
 
-        // Legacy blacklist is consulted only before migration creates siteRules.
-        const blacklisted = !settings.siteRules && isBlacklisted(settings.blacklist, location.href);
-        const siteRuleMatch = matchSiteRule(settings.siteRules, location.href);
-        const siteDisabled = siteRuleMatch && siteRuleMatch.enabled === false;
-        if (disabledForDocument || settings.enabled === false || blacklisted || siteDisabled) {
-          dispatchAbort();
-          return;
-        }
+      // Resolved per request: a frame that starts as about:blank takes its
+      // creator's URL once the parent has written into it.
+      const siteUrl = resolveSiteUrl(window);
+      if (!siteUrl) {
+        dispatchAbort();
+        return;
+      }
+      const siteHostname = hostnameOf(siteUrl);
 
-        const publicSettings = { ...settings };
-        delete publicSettings.blacklist;
-        delete publicSettings.enabled;
-        bridgeActive = true;
-        docEl.dispatchEvent(
-          new CustomEvent('VSC_SETTINGS_READY', {
-            detail: {
-              settings: publicSettings,
-              hostname: location.hostname.replace(/^www\./, ''),
-            },
-          })
-        );
-      },
-      { once: true }
-    );
+      // Legacy blacklist is consulted only before migration creates siteRules.
+      const blacklisted = !settings.siteRules && isBlacklisted(settings.blacklist, siteUrl);
+      const siteRuleMatch = matchSiteRule(settings.siteRules, siteUrl);
+      const siteDisabled = siteRuleMatch && siteRuleMatch.enabled === false;
+      if (disabledForDocument || settings.enabled === false || blacklisted || siteDisabled) {
+        dispatchAbort();
+        return;
+      }
+
+      const publicSettings = { ...settings };
+      delete publicSettings.blacklist;
+      delete publicSettings.enabled;
+      bridgeActive = true;
+      dispatch('VSC_SETTINGS_READY', {
+        settings: publicSettings,
+        hostname: siteHostname,
+      });
+    });
 
     chrome.storage.onChanged.addListener((changes, namespace) => {
       if (namespace !== 'sync') {
@@ -97,7 +182,7 @@ function init() {
       }
       if (enabledChange?.newValue === false) {
         bridgeActive = false;
-        docEl.dispatchEvent(new CustomEvent('VSC_MESSAGE', { detail: { type: 'VSC_TEARDOWN' } }));
+        dispatch('VSC_MESSAGE', { type: 'VSC_TEARDOWN' });
         return;
       }
       if (!bridgeActive) {
@@ -108,13 +193,13 @@ function init() {
       delete relayChanges.enabled;
       delete relayChanges.blacklist;
       if (Object.keys(relayChanges).length > 0) {
-        docEl.dispatchEvent(new CustomEvent('VSC_STORAGE_CHANGED', { detail: relayChanges }));
+        dispatch('VSC_STORAGE_CHANGED', relayChanges);
       }
     });
 
     chrome.runtime.onMessage.addListener((request) => {
       if (bridgeActive) {
-        docEl.dispatchEvent(new CustomEvent('VSC_MESSAGE', { detail: request }));
+        dispatch('VSC_MESSAGE', request);
       }
     });
 
@@ -140,11 +225,11 @@ function init() {
         }
       } catch (err) {
         if (err.message?.includes('Extension context invalidated')) {
-          docEl.removeEventListener('VSC_WRITE_STORAGE', handleWriteStorage);
+          offRoot('VSC_WRITE_STORAGE', handleWriteStorage);
         }
       }
     };
-    docEl.addEventListener('VSC_WRITE_STORAGE', handleWriteStorage);
+    onRoot('VSC_WRITE_STORAGE', handleWriteStorage);
 
     // Shortcut pressed in a frame without media: ask the background worker to
     // relay it to every other frame of this tab (cross-origin embeds).
@@ -171,11 +256,11 @@ function init() {
         });
       } catch (err) {
         if (err.message?.includes('Extension context invalidated')) {
-          docEl.removeEventListener('VSC_FORWARD_KEY', handleForwardKey);
+          offRoot('VSC_FORWARD_KEY', handleForwardKey);
         }
       }
     };
-    docEl.addEventListener('VSC_FORWARD_KEY', handleForwardKey);
+    onRoot('VSC_FORWARD_KEY', handleForwardKey);
   } catch (error) {
     console.error('[VSC] Bridge init failed:', error);
   }

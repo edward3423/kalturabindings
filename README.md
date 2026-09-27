@@ -56,6 +56,11 @@ This is a fork of [igrigorik/videospeed][github-release-link] with two changes:
   you first click inside the player. This fork forwards a matching shortcut
   from any frame of the tab to the frames that control media, so keys work no
   matter where focus is. The overlay controller is unchanged.
+- **Works in the Kaltura V2 (kWidget) player.** V2 builds its player by
+  writing HTML into a blank iframe from the parent page. Upstream refuses to
+  run in blank frames, and the rewrite erases every event listener anyway.
+  This fork resolves the frame's site from its same-origin parent and rebinds
+  its listeners whenever the frame's root element is replaced.
 - **Shortcuts win over the player's own keys.** Key listeners run in the
   window capture phase and "Exclusive keyboard shortcuts" is on by default,
   so a key bound in this extension is not also handled by the page. Without

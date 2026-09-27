@@ -8,7 +8,7 @@
 window.VSC = window.VSC || {};
 
 if (!window.VSC.StorageManager) {
-  const docEl = document.documentElement;
+  const docListeners = () => window.VSC.DocumentListeners;
 
   /** True when chrome.storage.sync is available (extension contexts). */
   const hasChrome = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync;
@@ -41,7 +41,7 @@ if (!window.VSC.StorageManager) {
       // No chrome.storage — request settings from bridge via CustomEvent
       return new Promise((resolve) => {
         const onReady = (e) => {
-          docEl.removeEventListener('VSC_SETTINGS_READY', onReady);
+          docListeners().remove('VSC_SETTINGS_READY', onReady);
           clearTimeout(timeout);
           const detail = e.detail;
 
@@ -78,14 +78,14 @@ if (!window.VSC.StorageManager) {
         };
 
         const timeout = setTimeout(() => {
-          docEl.removeEventListener('VSC_SETTINGS_READY', onReady);
+          docListeners().remove('VSC_SETTINGS_READY', onReady);
           window.VSC.logger?.warn?.('StorageManager: settings timeout, aborting initialization');
           resolve(null);
         }, 2000);
 
-        docEl.addEventListener('VSC_SETTINGS_READY', onReady);
+        docListeners().add('VSC_SETTINGS_READY', onReady);
 
-        docEl.dispatchEvent(new CustomEvent('VSC_REQUEST_SETTINGS'));
+        docListeners().dispatch('VSC_REQUEST_SETTINGS');
       });
     }
 
@@ -119,9 +119,7 @@ if (!window.VSC.StorageManager) {
       if (keys.length === 1 && keys[0] === 'lastSpeed') {
         const speed = data.lastSpeed;
         if (typeof speed === 'number' && Number.isFinite(speed)) {
-          docEl.dispatchEvent(
-            new CustomEvent('VSC_WRITE_STORAGE', { detail: { lastSpeed: speed } })
-          );
+          docListeners().dispatch('VSC_WRITE_STORAGE', { lastSpeed: speed });
         } else {
           window.VSC.logger?.warn?.('StorageManager.set: invalid lastSpeed value');
         }
@@ -205,7 +203,7 @@ if (!window.VSC.StorageManager) {
           }
         });
       } else {
-        docEl.addEventListener('VSC_STORAGE_CHANGED', (e) => {
+        docListeners().add('VSC_STORAGE_CHANGED', (e) => {
           const changes = e.detail;
           for (const [key, change] of Object.entries(changes)) {
             if (change.newValue !== undefined) {

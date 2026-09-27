@@ -271,7 +271,7 @@ class VideoSpeedExtension {
 
   /** Live-update the user's custom CSS when options are saved. */
   setupCSSLiveUpdates() {
-    document.documentElement.addEventListener('VSC_STORAGE_CHANGED', (e) => {
+    window.VSC.DocumentListeners.add('VSC_STORAGE_CHANGED', (e) => {
       if (e.detail?.customCSS?.newValue === undefined || !this._controllerSheet) {
         return;
       }
@@ -469,8 +469,20 @@ class VideoSpeedExtension {
 (function () {
   const extension = new VideoSpeedExtension();
 
+  // A document.open() rewrite (Kaltura V2 writes its player into a blank
+  // iframe) erases every window/document listener. Re-arm keyboard, gesture
+  // and ratechange listeners on the same document.
+  window.VSC.DocumentListeners.onRewrite(() => {
+    if (!extension.eventManager || !window.VSC.initialized) {
+      return;
+    }
+    window.VSC.logger?.info?.('Document rewritten - re-registering event listeners');
+    extension.eventManager.cleanup();
+    extension.eventManager.setupEventListeners(document);
+  });
+
   // Lifecycle commands from bridge (popup, background, storage changes)
-  document.documentElement.addEventListener('VSC_MESSAGE', (event) => {
+  window.VSC.DocumentListeners.add('VSC_MESSAGE', (event) => {
     const message = event.detail;
 
     // Handle namespaced VSC message types

@@ -109,8 +109,18 @@ async function requestSettings() {
 describe('content-bridge', () => {
   let cleanupIntercept = null;
   let eventCleanup = null;
+  // Each test loads a fresh bridge copy; its root watcher (MutationObserver)
+  // would otherwise outlive the test and answer on later replacement roots.
+  const observers = [];
+  const RealMutationObserver = globalThis.MutationObserver;
 
   beforeEach(() => {
+    globalThis.MutationObserver = class extends RealMutationObserver {
+      constructor(cb) {
+        super(cb);
+        observers.push(this);
+      }
+    };
     vi.useFakeTimers({ shouldAdvanceTime: true });
     installChromeMock();
     resetMockStorage();
@@ -119,6 +129,10 @@ describe('content-bridge', () => {
   });
 
   afterEach(() => {
+    for (const observer of observers.splice(0)) {
+      observer.disconnect();
+    }
+    globalThis.MutationObserver = RealMutationObserver;
     if (eventCleanup) {
       eventCleanup();
       eventCleanup = null;
@@ -203,8 +217,70 @@ describe('content-bridge', () => {
       expect(events[0].detail.abort).toBe(true);
     });
 
+    it('inherited about: frame uses the same-origin parent URL for site rules and hostname', async () => {
+      vi.stubGlobal('location', { href: 'about:blank', hostname: '', protocol: 'about:' });
+      const fakeParent = { location: { href: 'https://www.lms.example.edu/course/1' } };
+      fakeParent.parent = fakeParent;
+      const parentSpy = vi.spyOn(window, 'parent', 'get').mockReturnValue(fakeParent);
+      try {
+        const { events, cleanup } = collectEvents('VSC_SETTINGS_READY');
+        eventCleanup = cleanup;
+
+        await loadBridge();
+        await requestSettings();
+
+        expect(events).toHaveLength(1);
+        expect(events[0].detail.abort).toBeUndefined();
+        expect(events[0].detail.hostname).toBe('lms.example.edu');
+      } finally {
+        parentSpy.mockRestore();
+      }
+    });
+
+    it('inherited about: frame honors a site rule that disables the parent site', async () => {
+      vi.stubGlobal('location', { href: 'about:blank', hostname: '', protocol: 'about:' });
+      const fakeParent = { location: { href: 'https://lms.example.edu/course/1' } };
+      fakeParent.parent = fakeParent;
+      const parentSpy = vi.spyOn(window, 'parent', 'get').mockReturnValue(fakeParent);
+      getMockStorage().siteRules = [{ pattern: 'lms.example.edu', enabled: false }];
+      try {
+        const { events, cleanup } = collectEvents('VSC_SETTINGS_READY');
+        eventCleanup = cleanup;
+
+        await loadBridge();
+        await requestSettings();
+
+        expect(events).toEqual([{ type: 'VSC_SETTINGS_READY', detail: { abort: true } }]);
+      } finally {
+        parentSpy.mockRestore();
+      }
+    });
+
+    it('inherited about: frame fails closed when the ancestor is cross-origin', async () => {
+      vi.stubGlobal('location', { href: 'about:blank', hostname: '', protocol: 'about:' });
+      const fakeParent = {};
+      Object.defineProperty(fakeParent, 'location', {
+        get() {
+          throw new DOMException('Blocked a frame from accessing a cross-origin frame.');
+        },
+      });
+      fakeParent.parent = fakeParent;
+      const parentSpy = vi.spyOn(window, 'parent', 'get').mockReturnValue(fakeParent);
+      try {
+        const { events, cleanup } = collectEvents('VSC_SETTINGS_READY');
+        eventCleanup = cleanup;
+
+        await loadBridge();
+        await requestSettings();
+
+        expect(events).toEqual([{ type: 'VSC_SETTINGS_READY', detail: { abort: true } }]);
+      } finally {
+        parentSpy.mockRestore();
+      }
+    });
+
     it.each(['about:blank', 'about:BLANK', 'about:blank#child', 'about:srcdoc'])(
-      'fails closed in inherited frame %s',
+      'fails closed in inherited frame %s with no ancestor',
       async (href) => {
         vi.stubGlobal('location', { href, hostname: '', protocol: 'about:' });
         const { events, cleanup } = collectEvents('VSC_SETTINGS_READY');
@@ -216,6 +292,47 @@ describe('content-bridge', () => {
         expect(events).toEqual([{ type: 'VSC_SETTINGS_READY', detail: { abort: true } }]);
       }
     );
+  });
+
+  // =========================================================================
+  // Document rewrite (document.open) — listeners must follow the new root
+  // =========================================================================
+
+  describe('document rewrite', () => {
+    it('answers a settings request dispatched on a replacement root element', async () => {
+      await loadBridge();
+
+      const fresh = document.createElement('html');
+      fresh.appendChild(document.createElement('body'));
+      const original = document.documentElement;
+      document.replaceChild(fresh, original);
+      try {
+        await vi.advanceTimersByTimeAsync(0);
+
+        const events = [];
+        fresh.addEventListener('VSC_SETTINGS_READY', (e) => events.push(e.detail));
+        fresh.dispatchEvent(new CustomEvent('VSC_REQUEST_SETTINGS'));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(events).toHaveLength(1);
+        expect(events[0].abort).toBeUndefined();
+        expect(events[0].settings).toBeDefined();
+      } finally {
+        document.replaceChild(original, document.documentElement);
+      }
+    });
+
+    it('answers repeated settings requests (page world re-injected after a rewrite)', async () => {
+      await loadBridge();
+      const { events, cleanup } = collectEvents('VSC_SETTINGS_READY');
+      eventCleanup = cleanup;
+
+      await requestSettings();
+      await requestSettings();
+
+      expect(events).toHaveLength(2);
+      expect(events.every((e) => e.detail.settings)).toBe(true);
+    });
   });
 
   // =========================================================================
