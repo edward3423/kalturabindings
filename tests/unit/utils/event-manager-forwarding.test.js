@@ -89,6 +89,7 @@ describe('EventManager fork additions', () => {
       ['KeyJ', 74],
       ['KeyK', 75],
       ['KeyL', 76],
+      ['KeyM', 77],
     ];
     presses.forEach(([code, keyCode], i) => {
       eventManager.handleKeydown(makeEvent({ code, keyCode, timeStamp: 1000 + i }));
@@ -101,6 +102,7 @@ describe('EventManager fork additions', () => {
       { action: 'rewind', value: 10 },
       { action: 'pause', value: 0 },
       { action: 'advance', value: 10 },
+      { action: 'muted', value: 0 },
     ]);
   });
 

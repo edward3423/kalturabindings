@@ -58,6 +58,8 @@ export default async function runKalturaE2ETests() {
         rate: v.playbackRate,
         time: v.currentTime,
         paused: v.paused,
+        muted: v.muted,
+        volume: v.volume,
         activeInsidePlayer: !!a && !!a.closest('.playkit-player'),
       };
     });
@@ -128,6 +130,20 @@ export default async function runKalturaE2ETests() {
       }
     );
 
+    await runTest(
+      'M toggles mute with the player focused (custom row wins over marker)',
+      async () => {
+        const before = (await videoState(getFrame(page))).muted;
+        await page.keyboard.press('KeyM');
+        await sleep(600);
+        const after = (await videoState(getFrame(page))).muted;
+        assert.true(before !== after, `muted should flip (before=${before}, after=${after})`);
+        await page.keyboard.press('KeyM');
+        await sleep(600);
+        assert.equal((await videoState(getFrame(page))).muted, before, 'muted should flip back');
+      }
+    );
+
     await runTest('Q returns to 1x with the host page focused (forwarded)', async () => {
       await page.evaluate(() => {
         document.querySelector('h1').setAttribute('tabindex', '-1');
@@ -143,6 +159,51 @@ export default async function runKalturaE2ETests() {
       await page.keyboard.press('KeyR');
       await sleep(600);
       assert.equal((await videoState(getFrame(page))).rate, 4, 'rate should be 4x');
+    });
+    await runTest('Muted autoplay: M unmutes and the player keeps it unmuted', async () => {
+      await page.goto(`http://localhost:${host.port}/kaltura-autoplay.html`, {
+        waitUntil: 'domcontentloaded',
+      });
+      const frame = await (async () => {
+        for (let i = 0; i < 60; i++) {
+          const f = getFrame(page);
+          if (f) {
+            return f;
+          }
+          await sleep(500);
+        }
+        return null;
+      })();
+      assert.true(!!frame, 'Kaltura frame should exist');
+      await frame.waitForSelector('vsc-controller', { timeout: 90000 });
+      await frame.waitForFunction(
+        () => {
+          const v = document.querySelector('video');
+          return v && v.readyState >= 3 && !v.paused;
+        },
+        { timeout: 90000 }
+      );
+      await sleep(1000);
+      // The test browser may allow unmuted autoplay (earlier clicks grant
+      // activation). Put the player into the same state its muted-autoplay
+      // fallback produces, through Kaltura's own player API.
+      await frame.evaluate(() => {
+        const players = window.KalturaPlayer.getPlayers();
+        const player = players[Object.keys(players)[0]];
+        player.muted = true;
+      });
+      await sleep(500);
+      const start = await videoState(frame);
+      assert.true(start.muted, `player should start muted (muted=${start.muted})`);
+
+      await page.evaluate(() => document.body.focus());
+      await page.keyboard.press('KeyM');
+      await sleep(500);
+      assert.true(!(await videoState(frame)).muted, 'M should unmute');
+      await sleep(2000);
+      const later = await videoState(frame);
+      assert.true(!later.muted, 'player must not re-mute after M');
+      assert.true(!later.paused, 'video should keep playing');
     });
   } catch (error) {
     console.log(`   💥 Suite error: ${error.message}`);

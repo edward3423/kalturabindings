@@ -78,11 +78,12 @@ This is a fork of [igrigorik/videospeed][github-release-link] with two changes:
   | J            | rewind 10 seconds                        |
   | K            | play / pause                             |
   | L            | advance 10 seconds                       |
+  | M            | mute / unmute                            |
   | Shift (held) | 8x while held, previous speed on release |
 
   Custom rows take precedence over the built-in rows on the same key, so R
-  sets 4x rather than resetting, and J rewinds rather than jumping to the
-  marker. Delete a custom row in settings to get the built-in behavior back.
+  sets 4x rather than resetting, J rewinds rather than jumping to the
+  marker, and M mutes rather than setting a marker. Delete a custom row in settings to get the built-in behavior back.
   Two new actions are available in the action dropdown: "Set speed"
   (absolute speed) and "Hold speed while key is held". The hold value is
   editable like any other row, and hold is the one action that accepts a

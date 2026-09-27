@@ -249,6 +249,7 @@ export const DEFAULT_CUSTOM_BINDINGS = Object.freeze([
   { action: 'rewind', code: 'KeyJ', key: 74, keyCode: 74, displayKey: 'j', value: 10 },
   { action: 'pause', code: 'KeyK', key: 75, keyCode: 75, displayKey: 'k', value: 0 },
   { action: 'advance', code: 'KeyL', key: 76, keyCode: 76, displayKey: 'l', value: 10 },
+  { action: 'muted', code: 'KeyM', key: 77, keyCode: 77, displayKey: 'm', value: 0 },
   { action: 'hold', code: 'ShiftLeft', key: 16, keyCode: 16, displayKey: 'Shift', value: 8 },
   {
     action: 'hold',
