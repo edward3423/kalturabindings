@@ -548,6 +548,12 @@ class VideoSpeedExtension {
           }
           break;
 
+        case window.VSC.Constants.MESSAGE_TYPES.FORWARDED_KEY:
+          if (extension.eventManager) {
+            extension.eventManager.handleForwardedKey(message.key);
+          }
+          break;
+
         case window.VSC.Constants.MESSAGE_TYPES.TEARDOWN:
           extension.teardown();
           break;

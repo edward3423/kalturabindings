@@ -232,6 +232,22 @@ export const DEFAULT_BINDINGS = Object.freeze({
   jump: { code: 'KeyJ', key: 74, keyCode: 74, displayKey: 'j', value: 0 },
 });
 
+/**
+ * Default custom (non-predefined) bindings shipped with this fork.
+ * Custom bindings take precedence over predefined ones when keys collide
+ * (see EventManager.findMatchingBinding), so R and J below win over the
+ * predefined reset/jump rows.
+ */
+export const DEFAULT_CUSTOM_BINDINGS = Object.freeze([
+  { action: 'speed', code: 'KeyQ', key: 81, keyCode: 81, displayKey: 'q', value: 1 },
+  { action: 'speed', code: 'KeyW', key: 87, keyCode: 87, displayKey: 'w', value: 2 },
+  { action: 'speed', code: 'KeyE', key: 69, keyCode: 69, displayKey: 'e', value: 3 },
+  { action: 'speed', code: 'KeyR', key: 82, keyCode: 82, displayKey: 'r', value: 4 },
+  { action: 'rewind', code: 'KeyJ', key: 74, keyCode: 74, displayKey: 'j', value: 10 },
+  { action: 'pause', code: 'KeyK', key: 75, keyCode: 75, displayKey: 'k', value: 0 },
+  { action: 'advance', code: 'KeyL', key: 76, keyCode: 76, displayKey: 'l', value: 10 },
+]);
+
 /** event.code values that must not be recorded as shortcuts. */
 export const BLACKLISTED_CODES = new Set([
   'Tab',

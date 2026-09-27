@@ -94,6 +94,7 @@ const ACTION_OPTIONS = [
   ['advance', 'Advance'],
   ['reset', 'Reset speed'],
   ['fast', 'Preferred speed'],
+  ['speed', 'Set speed'],
   ['muted', 'Mute'],
   ['softer', 'Decrease volume'],
   ['louder', 'Increase volume'],

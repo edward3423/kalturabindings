@@ -199,6 +199,26 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 });
 
 /**
+ * Relay a shortcut from a frame without media to every other frame of the
+ * same tab. chrome.tabs.sendMessage without a frameId reaches all frames;
+ * the origin frame is excluded by frameId so it never double-handles.
+ */
+chrome.runtime.onMessage.addListener((message, sender) => {
+  if (!message || message.type !== 'VSC_FORWARD_KEY' || !sender.tab) {
+    return;
+  }
+  chrome.tabs
+    .sendMessage(sender.tab.id, {
+      type: 'VSC_FORWARDED_KEY',
+      key: message.key,
+      sourceFrameId: sender.frameId,
+    })
+    .catch(() => {
+      // Tab or frames without a listener; nothing to relay to.
+    });
+});
+
+/**
  * Initialize on install/update
  */
 chrome.runtime.onInstalled.addListener(async () => {

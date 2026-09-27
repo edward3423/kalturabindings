@@ -104,16 +104,25 @@ class EventManager {
       return false;
     }
 
-    // Ignore keydown event if no media elements are present
+    // Find matching key binding using the three-tier algorithm
+    const keyBinding = this.findMatchingBinding(event);
+
+    // No media in this frame: the video may live in another frame of the same
+    // tab (cross-origin embeds such as Kaltura). Forward matching shortcuts to
+    // every other frame through the bridge instead of dropping them.
     const mediaElements = window.VSC.stateManager
       ? window.VSC.stateManager.getControlledElements()
       : [];
     if (!mediaElements.length) {
+      if (keyBinding) {
+        this.forwardKey(event);
+        if (this.config.settings.exclusiveKeys) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }
       return false;
     }
-
-    // Find matching key binding using the three-tier algorithm
-    const keyBinding = this.findMatchingBinding(event);
 
     if (keyBinding) {
       this.actionHandler.runAction(keyBinding.action, keyBinding.value, event);
@@ -133,6 +142,47 @@ class EventManager {
     }
 
     return false;
+  }
+
+  /**
+   * Serialize a keyboard event and hand it to the bridge, which relays it to
+   * every other frame in the tab. Frames that control media apply it.
+   * @param {KeyboardEvent} event
+   * @private
+   */
+  forwardKey(event) {
+    const detail = EventManager.serializeKey(event);
+    window.VSC.logger.debug(`Forwarding shortcut to other frames: code=${detail.code}`);
+    document.documentElement.dispatchEvent(new CustomEvent('VSC_FORWARD_KEY', { detail }));
+  }
+
+  /**
+   * Apply a shortcut forwarded from another frame of this tab. Only frames
+   * that control media act on it; typing-context checks were already done
+   * in the frame where the key was pressed.
+   * @param {Object} key - Serialized key (see serializeKey)
+   * @returns {boolean} True when a binding was executed
+   */
+  handleForwardedKey(key) {
+    if (!key || typeof key !== 'object') {
+      return false;
+    }
+
+    const mediaElements = window.VSC.stateManager
+      ? window.VSC.stateManager.getControlledElements()
+      : [];
+    if (!mediaElements.length) {
+      return false;
+    }
+
+    const keyBinding = this.findMatchingBinding(key);
+    if (!keyBinding) {
+      return false;
+    }
+
+    window.VSC.logger.debug(`Applying forwarded shortcut: code=${key.code}`);
+    this.actionHandler.runAction(keyBinding.action, keyBinding.value, null);
+    return true;
   }
 
   /**
@@ -159,7 +209,7 @@ class EventManager {
    * @private
    */
   findMatchingBinding(event) {
-    const bindings = this.config.settings.keyBindings;
+    const bindings = EventManager.orderBindings(this.config.settings.keyBindings);
     const code = event.code;
     const keyCode = event.keyCode;
     const ctrl = !!event.ctrlKey;
@@ -498,6 +548,42 @@ class EventManager {
  */
 EventManager.modifiersMatch = function (mods, ctrl, alt, meta, shift) {
   return mods.ctrl === ctrl && mods.alt === alt && mods.meta === meta && mods.shift === shift;
+};
+
+/**
+ * Custom (user-added) bindings take precedence over predefined ones when the
+ * same key is bound twice. Stable within each group, so storage order still
+ * decides between two custom bindings.
+ * @param {Array} bindings
+ * @returns {Array}
+ */
+EventManager.orderBindings = function (bindings) {
+  if (!Array.isArray(bindings)) {
+    return [];
+  }
+  const custom = bindings.filter((b) => !b.predefined);
+  if (custom.length === 0) {
+    return bindings;
+  }
+  return [...custom, ...bindings.filter((b) => b.predefined)];
+};
+
+/**
+ * Reduce a KeyboardEvent to the plain fields findMatchingBinding reads, so it
+ * can cross the extension messaging boundary between frames.
+ * @param {KeyboardEvent} event
+ * @returns {{code: string, key: string, keyCode: number, ctrlKey: boolean, altKey: boolean, metaKey: boolean, shiftKey: boolean}}
+ */
+EventManager.serializeKey = function (event) {
+  return {
+    code: event.code,
+    key: event.key,
+    keyCode: event.keyCode,
+    ctrlKey: !!event.ctrlKey,
+    altKey: !!event.altKey,
+    metaKey: !!event.metaKey,
+    shiftKey: !!event.shiftKey,
+  };
 };
 
 // Timing constants live where the state lives: gesture-window timing on

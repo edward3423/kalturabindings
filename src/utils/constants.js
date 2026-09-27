@@ -11,6 +11,7 @@ import {
   PREDEFINED_ACTIONS,
   BLACKLISTED_CODES,
   DEFAULT_BINDINGS,
+  DEFAULT_CUSTOM_BINDINGS,
 } from './key-maps.js';
 import { DEFAULT_CONTROLLER_CSS } from '../styles/controller-css-defaults.js';
 
@@ -40,11 +41,14 @@ if (!window.VSC.Constants.DEFAULT_SETTINGS) {
     controllerOpacity: 0.3, // default: 0.3
     controllerButtonSize: 14,
     customCSS: '', // user's additional CSS injected alongside the built-in defaults
-    keyBindings: PREDEFINED_ACTIONS.map((action) => ({
-      action,
-      ...DEFAULT_BINDINGS[action],
-      predefined: true,
-    })),
+    keyBindings: [
+      ...PREDEFINED_ACTIONS.map((action) => ({
+        action,
+        ...DEFAULT_BINDINGS[action],
+        predefined: true,
+      })),
+      ...DEFAULT_CUSTOM_BINDINGS.map((binding) => ({ ...binding, predefined: false })),
+    ],
     siteRules: [
       { pattern: 'imgur.com', enabled: false, speed: null },
       { pattern: 'teams.microsoft.com', enabled: false, speed: null },
@@ -83,6 +87,7 @@ meet.google.com`.replace(regStrip, ''),
     RESET_SPEED: 'VSC_RESET_SPEED',
     TOGGLE_DISPLAY: 'VSC_TOGGLE_DISPLAY',
     TEARDOWN: 'VSC_TEARDOWN',
+    FORWARDED_KEY: 'VSC_FORWARDED_KEY',
   };
 
   const SPEED_LIMITS = {

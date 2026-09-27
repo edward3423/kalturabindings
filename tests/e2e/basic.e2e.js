@@ -95,12 +95,12 @@ export default async function runBasicE2ETests() {
       await controlVideo(page, 'faster');
       await controlVideo(page, 'faster');
 
-      // Then reset using R key
-      await testKeyboardShortcut(page, 'KeyR');
+      // Then return to 1x using the fork's Q key (R is bound to 4x)
+      await testKeyboardShortcut(page, 'KeyQ');
       await sleep(500);
 
       const speed = await getVideoSpeed(page);
-      assert.approximately(speed, 1.0, 0.1, 'Speed should be approximately 1.0 after reset');
+      assert.approximately(speed, 1.0, 0.1, 'Speed should be approximately 1.0 after Q');
     });
 
     await runTest('Keyboard shortcuts should work', async () => {
@@ -133,16 +133,13 @@ export default async function runBasicE2ETests() {
       console.log(`   🔍 Speed after S key: ${slowerSpeed}`);
       assert.true(slowerSpeed < newSpeed, 'S key should decrease speed');
 
-      // Test 'R' key for reset (should change speed from current)
-      const speedBeforeReset = await getVideoSpeed(page);
+      // Test 'R' key: the fork's default custom row sets 4x and shadows
+      // the predefined reset binding on the same key
       await testKeyboardShortcut(page, 'KeyR');
-      await sleep(200); // Give time for reset to process
-      const resetSpeed = await getVideoSpeed(page);
-      console.log(`   🔍 Speed before R key: ${speedBeforeReset}, after R key: ${resetSpeed}`);
-      assert.true(
-        resetSpeed !== speedBeforeReset,
-        `R key should change speed from ${speedBeforeReset}, got ${resetSpeed}`
-      );
+      await sleep(200);
+      const fourX = await getVideoSpeed(page);
+      console.log(`   🔍 Speed after R key: ${fourX}`);
+      assert.approximately(fourX, 4.0, 0.01, 'R key should set 4x');
     });
 
     await runTest(

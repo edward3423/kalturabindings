@@ -112,6 +112,11 @@ class ActionHandler {
         window.VSC.DragHandler.handleDrag(video, e);
         break;
 
+      case 'speed':
+        window.VSC.logger.debug('Set speed to:', value);
+        this.adjustSpeed(video, value, { authorityBatch: options.authorityBatch });
+        break;
+
       case 'fast':
         window.VSC.logger.debug('Preferred speed');
         this.resetSpeed(video, value, this.config.getKeyBinding('reset'), options);

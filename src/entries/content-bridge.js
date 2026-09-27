@@ -145,6 +145,37 @@ function init() {
       }
     };
     docEl.addEventListener('VSC_WRITE_STORAGE', handleWriteStorage);
+
+    // Shortcut pressed in a frame without media: ask the background worker to
+    // relay it to every other frame of this tab (cross-origin embeds).
+    const handleForwardKey = (e) => {
+      try {
+        if (!bridgeActive) {
+          return;
+        }
+        const key = e.detail;
+        if (!key || typeof key !== 'object' || typeof key.code !== 'string') {
+          return;
+        }
+        chrome.runtime.sendMessage({
+          type: 'VSC_FORWARD_KEY',
+          key: {
+            code: key.code,
+            key: typeof key.key === 'string' ? key.key : '',
+            keyCode: typeof key.keyCode === 'number' ? key.keyCode : 0,
+            ctrlKey: !!key.ctrlKey,
+            altKey: !!key.altKey,
+            metaKey: !!key.metaKey,
+            shiftKey: !!key.shiftKey,
+          },
+        });
+      } catch (err) {
+        if (err.message?.includes('Extension context invalidated')) {
+          docEl.removeEventListener('VSC_FORWARD_KEY', handleForwardKey);
+        }
+      }
+    };
+    docEl.addEventListener('VSC_FORWARD_KEY', handleForwardKey);
   } catch (error) {
     console.error('[VSC] Bridge init failed:', error);
   }

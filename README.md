@@ -1,6 +1,6 @@
 # [Install from Chrome Web Store][chrome-web-store-link]
 
-[![Chrome Web Store][chrome-web-store-version]][chrome-web-store-link] [![Chrome Web Store Users][chrome-web-store-users-badge]][chrome-web-store-link] [![Chrome Web Store Users][chrome-web-store-stars]][chrome-web-store-link]  
+[![Chrome Web Store][chrome-web-store-version]][chrome-web-store-link] [![Chrome Web Store Users][chrome-web-store-users-badge]][chrome-web-store-link] [![Chrome Web Store Users][chrome-web-store-stars]][chrome-web-store-link]
 
 **Video Speed Controller** gives you fine-grained control over any HTML5 video
 or audio element, on any site.
@@ -25,7 +25,6 @@ HTML5 media elements expose a native playback rate API, but most players hide
 or artificially limit it. Speed adjustments should be effortless and frequent:
 we don't read at a fixed pace, and we shouldn't watch at one either.
 
-
 ## Features
 
 - **Universal** - works on any site with HTML5 media: YouTube, Netflix,
@@ -46,6 +45,47 @@ we don't read at a fixed pace, and we shouldn't watch at one either.
   (Ctrl, Shift, Alt), create multiple preferred-speed toggles.
 - **Custom controller CSS** - style or reposition the overlay with your own
   CSS rules.
+
+## About this fork
+
+This is a fork of [igrigorik/videospeed][github-release-link] with two changes:
+
+- **Cross-frame shortcuts.** Upstream only handles a shortcut in the frame
+  that has keyboard focus. Players embedded in a cross-origin iframe (Kaltura
+  in Canvas, Moodle, MediaSpace, and similar) therefore ignore shortcuts unless
+  you first click inside the player. This fork forwards a matching shortcut
+  from any frame of the tab to the frames that control media, so keys work no
+  matter where focus is. The overlay controller is unchanged.
+- **Extra default shortcuts**, added as custom rows on the settings page:
+
+  | Key | Action             |
+  | --- | ------------------ |
+  | Q   | set speed to 1x    |
+  | W   | set speed to 2x    |
+  | E   | set speed to 3x    |
+  | R   | set speed to 4x    |
+  | J   | rewind 10 seconds  |
+  | K   | play / pause       |
+  | L   | advance 10 seconds |
+
+  Custom rows take precedence over the built-in rows on the same key, so R
+  sets 4x rather than resetting, and J rewinds rather than jumping to the
+  marker. Delete a custom row in settings to get the built-in behavior back.
+  A new "Set speed" action (absolute speed) is available in the action
+  dropdown for further custom rows.
+
+### Build and load
+
+```
+npm install
+npm run build
+```
+
+Then open `chrome://extensions`, enable Developer mode, choose "Load
+unpacked" and select the `dist` folder. Note that recent branded Chrome
+builds ignore the `--load-extension` flag, so the E2E suite needs Chrome for
+Testing (`npx puppeteer browsers install chrome@stable`) and
+`PUPPETEER_EXECUTABLE_PATH` pointing at it.
 
 ## Default keyboard shortcuts
 
@@ -73,6 +113,5 @@ for them to take effect.
 [chrome-web-store-users-badge]: https://img.shields.io/chrome-web-store/users/nffaoalbilbmmfgbnbgppjihopabppdk
 [chrome-web-store-stars]: https://img.shields.io/chrome-web-store/stars/nffaoalbilbmmfgbnbgppjihopabppdk
 [github-release-badge]: https://img.shields.io/github/v/release/igrigorik/videospeed
-
 [chrome-web-store-link]: https://chromewebstore.google.com/detail/video-speed-controller/nffaoalbilbmmfgbnbgppjihopabppdk
 [github-release-link]: https://github.com/igrigorik/videospeed/releases

@@ -227,6 +227,10 @@ describe('ActionHandler', () => {
     expect(jumpBinding).toBeDefined();
     expect(jumpBinding.key).toBe(74);
 
+    // The default custom J (rewind) binding shadows predefined jump; drop
+    // custom bindings here so this test exercises the predefined path.
+    config.settings.keyBindings = config.settings.keyBindings.filter((kb) => kb.predefined);
+
     // Simulate pressing M key to set mark
     eventManager.handleKeydown({
       code: 'KeyM',
@@ -1179,8 +1183,11 @@ describe('ActionHandler', () => {
     const eventManager = new window.VSC.EventManager(config, actionHandler);
     actionHandler.eventManager = eventManager;
 
-    // Test with custom reset speed via keyboard simulation
+    // Test with custom reset speed via keyboard simulation. The default
+    // custom R (speed 4x) binding shadows predefined reset; drop custom
+    // bindings so R reaches the predefined reset action.
     config.setKeyBinding('reset', 1.5);
+    config.settings.keyBindings = config.settings.keyBindings.filter((kb) => kb.predefined);
     const mockVideo = createTestVideoWithController(config, actionHandler, { playbackRate: 2.0 });
 
     // Simulate pressing R key (82) - this will pass the configured value automatically
