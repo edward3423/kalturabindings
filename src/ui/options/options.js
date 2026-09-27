@@ -95,6 +95,7 @@ const ACTION_OPTIONS = [
   ['reset', 'Reset speed'],
   ['fast', 'Preferred speed'],
   ['speed', 'Set speed'],
+  ['hold', 'Hold speed while key is held'],
   ['muted', 'Mute'],
   ['softer', 'Decrease volume'],
   ['louder', 'Increase volume'],
@@ -404,6 +405,24 @@ function recordKeyPress(e) {
     e.target.keyCode = null;
     e.target.displayKey = null;
     e.target.modifiers = undefined;
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
+
+  // A modifier key on its own is only meaningful for the hold action
+  // (speed applies while the key is held). Record it without modifiers so
+  // the binding matches the bare key press.
+  const rowAction = e.target.closest('.row')?.querySelector('.customDo')?.value;
+  const modifierLabel = window.VSC.Constants.MODIFIER_CODES[e.code];
+  if (modifierLabel && rowAction === 'hold') {
+    e.target.code = e.code;
+    e.target.keyCode = e.keyCode;
+    e.target.displayKey = modifierLabel;
+    e.target.modifiers = undefined;
+    e.target.value = modifierLabel;
+    autoSizeKeyInput(e.target);
+    clearWarning(e.target);
     e.preventDefault();
     e.stopPropagation();
     return;

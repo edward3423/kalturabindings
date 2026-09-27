@@ -69,21 +69,24 @@ This is a fork of [igrigorik/videospeed][github-release-link] with two changes:
   keys too.
 - **Extra default shortcuts**, added as custom rows on the settings page:
 
-  | Key | Action             |
-  | --- | ------------------ |
-  | Q   | set speed to 1x    |
-  | W   | set speed to 2x    |
-  | E   | set speed to 3x    |
-  | R   | set speed to 4x    |
-  | J   | rewind 10 seconds  |
-  | K   | play / pause       |
-  | L   | advance 10 seconds |
+  | Key          | Action                                   |
+  | ------------ | ---------------------------------------- |
+  | Q            | set speed to 1x                          |
+  | W            | set speed to 2x                          |
+  | E            | set speed to 3x                          |
+  | R            | set speed to 4x                          |
+  | J            | rewind 10 seconds                        |
+  | K            | play / pause                             |
+  | L            | advance 10 seconds                       |
+  | Shift (held) | 8x while held, previous speed on release |
 
   Custom rows take precedence over the built-in rows on the same key, so R
   sets 4x rather than resetting, and J rewinds rather than jumping to the
   marker. Delete a custom row in settings to get the built-in behavior back.
-  A new "Set speed" action (absolute speed) is available in the action
-  dropdown for further custom rows.
+  Two new actions are available in the action dropdown: "Set speed"
+  (absolute speed) and "Hold speed while key is held". The hold value is
+  editable like any other row, and hold is the one action that accepts a
+  modifier key on its own.
 
 ### Build and load
 

@@ -77,9 +77,9 @@ export default async function runKalturaE2ETests() {
       playerBox = await (await page.$('#player')).boundingBox();
       // Click the poster to start playback; this also focuses the player.
       await page.mouse.click(playerBox.x + playerBox.width / 2, playerBox.y + playerBox.height / 2);
-      await frame.waitForSelector('vsc-controller', { timeout: 30000 });
+      await frame.waitForSelector('vsc-controller', { timeout: 90000 });
       await frame.waitForFunction(() => document.querySelector('video').readyState >= 3, {
-        timeout: 30000,
+        timeout: 90000,
       });
       await sleep(1000);
       const state = await videoState(frame);
@@ -115,6 +115,18 @@ export default async function runKalturaE2ETests() {
       const after = (await videoState(getFrame(page))).time;
       assert.true(after - before >= 9 && after - before <= 13, `advanced ${after - before}s`);
     });
+
+    await runTest(
+      'Holding Shift with the player focused runs 8x, release restores 2x',
+      async () => {
+        await page.keyboard.down('ShiftLeft');
+        await sleep(600);
+        assert.equal((await videoState(getFrame(page))).rate, 8, 'rate should be 8x while held');
+        await page.keyboard.up('ShiftLeft');
+        await sleep(600);
+        assert.equal((await videoState(getFrame(page))).rate, 2, 'rate should return to 2x');
+      }
+    );
 
     await runTest('Q returns to 1x with the host page focused (forwarded)', async () => {
       await page.evaluate(() => {

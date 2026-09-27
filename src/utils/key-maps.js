@@ -197,6 +197,9 @@ export function displayKeyFromCode(code) {
   if (punctuation[code]) {
     return punctuation[code];
   }
+  if (MODIFIER_CODES[code]) {
+    return MODIFIER_CODES[code];
+  }
   // Everything else (Space, Backspace, Enter, Escape, Arrow*, F1-F24, Delete, etc.)
   // is already human-readable as-is
   return code;
@@ -246,7 +249,31 @@ export const DEFAULT_CUSTOM_BINDINGS = Object.freeze([
   { action: 'rewind', code: 'KeyJ', key: 74, keyCode: 74, displayKey: 'j', value: 10 },
   { action: 'pause', code: 'KeyK', key: 75, keyCode: 75, displayKey: 'k', value: 0 },
   { action: 'advance', code: 'KeyL', key: 76, keyCode: 76, displayKey: 'l', value: 10 },
+  { action: 'hold', code: 'ShiftLeft', key: 16, keyCode: 16, displayKey: 'Shift', value: 8 },
+  {
+    action: 'hold',
+    code: 'ShiftRight',
+    key: 16,
+    keyCode: 16,
+    displayKey: 'Right Shift',
+    value: 8,
+  },
 ]);
+
+/**
+ * Modifier keys may only be bound on their own to the "hold" action (the
+ * speed applies while the key is held). Everywhere else they stay blocked.
+ */
+export const MODIFIER_CODES = Object.freeze({
+  ShiftLeft: 'Shift',
+  ShiftRight: 'Right Shift',
+  ControlLeft: 'Ctrl',
+  ControlRight: 'Right Ctrl',
+  AltLeft: 'Alt',
+  AltRight: 'Right Alt',
+  MetaLeft: 'Meta',
+  MetaRight: 'Right Meta',
+});
 
 /** event.code values that must not be recorded as shortcuts. */
 export const BLACKLISTED_CODES = new Set([

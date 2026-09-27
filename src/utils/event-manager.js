@@ -13,6 +13,9 @@ class EventManager {
     // Event deduplication to prevent duplicate key processing
     this.lastKeyEventSignature = null;
 
+    // Active "hold" shortcut: { code, saved: Map<media, speed before hold> }
+    this.hold = null;
+
     // Decision core: classifier (gesture evidence -> verdicts) + arbiter
     // (pure transition table). See docs/speed-arbitration.md. This module
     // is an adapter: it owns DOM listeners and consumes the write-token
@@ -55,8 +58,11 @@ class EventManager {
       const target = doc.defaultView || doc;
       const keydownHandler = (event) => this.handleKeydown(event);
       const keyupHandler = (event) => this.handleKeyup(event);
+      // A key released while the window is not focused never reports keyup.
+      const blurHandler = () => this.endHold();
       target.addEventListener('keydown', keydownHandler, true);
       target.addEventListener('keyup', keyupHandler, true);
+      target.addEventListener('blur', blurHandler);
 
       // Store references for cleanup. Keyup only retires the short-lived
       // YouTube Space-hold signature; it never handles VSC shortcuts.
@@ -67,7 +73,8 @@ class EventManager {
         .get(target)
         .push(
           { type: 'keydown', handler: keydownHandler, useCapture: true },
-          { type: 'keyup', handler: keyupHandler, useCapture: true }
+          { type: 'keyup', handler: keyupHandler, useCapture: true },
+          { type: 'blur', handler: blurHandler, useCapture: false }
         );
     });
   }
@@ -120,8 +127,12 @@ class EventManager {
       : [];
     if (!mediaElements.length) {
       if (keyBinding) {
+        // Auto-repeat of a held key carries no new information.
+        if (keyBinding.action === 'hold' && event.repeat) {
+          return false;
+        }
         this.forwardKey(event);
-        if (this.config.settings.exclusiveKeys) {
+        if (this.config.settings.exclusiveKeys && keyBinding.action !== 'hold') {
           EventManager.claimEvent(event);
         }
       }
@@ -129,6 +140,15 @@ class EventManager {
     }
 
     if (keyBinding) {
+      if (keyBinding.action === 'hold') {
+        // Modifier keydowns are never claimed: pages read the modifier state
+        // from later events, not from this one, and there is no default to stop.
+        if (!event.repeat) {
+          this.beginHold(keyBinding);
+        }
+        return false;
+      }
+
       this.actionHandler.runAction(keyBinding.action, keyBinding.value, event);
 
       if (this.config.settings.exclusiveKeys) {
@@ -178,12 +198,27 @@ class EventManager {
       return false;
     }
 
+    if (key.type === 'keyup') {
+      if (!this.findHoldBinding(key) || !this.hold) {
+        return false;
+      }
+      this.endHold();
+      return true;
+    }
+
     const keyBinding = this.findMatchingBinding(key);
     if (!keyBinding) {
       return false;
     }
 
     window.VSC.logger.debug(`Applying forwarded shortcut: code=${key.code}`);
+    if (keyBinding.action === 'hold') {
+      if (key.repeat) {
+        return false;
+      }
+      this.beginHold(keyBinding);
+      return true;
+    }
     this.actionHandler.runAction(keyBinding.action, keyBinding.value, null);
     return true;
   }
@@ -199,6 +234,78 @@ class EventManager {
     if (media) {
       this.arbitration.noteTemporaryOverrideEnd(media);
     }
+
+    if (!this.findHoldBinding(event)) {
+      return;
+    }
+    const mediaElements = window.VSC.stateManager
+      ? window.VSC.stateManager.getControlledElements()
+      : [];
+    if (mediaElements.length) {
+      this.endHold();
+    } else {
+      // The hold started in another frame of this tab; release it there.
+      this.forwardKey(event);
+    }
+  }
+
+  /**
+   * Find a "hold" binding for the physical key of this event, ignoring
+   * modifier state: releasing Shift reports shiftKey=false.
+   * @param {{code: string, keyCode: number}} event
+   * @returns {Object|undefined}
+   * @private
+   */
+  findHoldBinding(event) {
+    const bindings = this.config.settings.keyBindings || [];
+    if (event.code && event.code !== 'Unidentified') {
+      return bindings.find((b) => b.action === 'hold' && b.code === event.code);
+    }
+    return bindings.find((b) => b.action === 'hold' && (b.keyCode ?? b.key) === event.keyCode);
+  }
+
+  /**
+   * Start a hold: remember each controlled media element's speed, then apply
+   * the binding's speed. A second press while holding is ignored.
+   * @param {Object} binding - the matched hold binding
+   */
+  beginHold(binding) {
+    if (this.hold) {
+      return;
+    }
+    const mediaElements = window.VSC.stateManager
+      ? window.VSC.stateManager.getControlledElements()
+      : [];
+    const saved = new Map();
+    mediaElements.forEach((video) => {
+      if (video.vsc) {
+        saved.set(video, video.playbackRate);
+      }
+    });
+    if (saved.size === 0) {
+      return;
+    }
+    this.hold = { code: binding.code, saved };
+    window.VSC.logger.debug(`Hold: ${binding.value}x while ${binding.code} is held`);
+    this.actionHandler.runAction('speed', binding.value, null);
+  }
+
+  /**
+   * End the active hold and restore each media element's previous speed.
+   */
+  endHold() {
+    if (!this.hold) {
+      return;
+    }
+    const { saved } = this.hold;
+    this.hold = null;
+    const authorityBatch = this.actionHandler.createAuthorityBatch();
+    for (const [video, speed] of saved) {
+      if (video.isConnected && video.vsc) {
+        this.actionHandler.adjustSpeed(video, speed, { authorityBatch });
+      }
+    }
+    window.VSC.logger.debug('Hold released: previous speeds restored');
   }
 
   /**
@@ -529,6 +636,7 @@ class EventManager {
    * Clean up all event listeners
    */
   cleanup() {
+    this.endHold();
     this.listeners.forEach((eventList, doc) => {
       eventList.forEach(({ type, handler, useCapture }) => {
         try {
@@ -592,6 +700,8 @@ EventManager.orderBindings = function (bindings) {
  */
 EventManager.serializeKey = function (event) {
   return {
+    type: event.type === 'keyup' ? 'keyup' : 'keydown',
+    repeat: !!event.repeat,
     code: event.code,
     key: event.key,
     keyCode: event.keyCode,

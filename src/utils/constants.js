@@ -12,6 +12,7 @@ import {
   BLACKLISTED_CODES,
   DEFAULT_BINDINGS,
   DEFAULT_CUSTOM_BINDINGS,
+  MODIFIER_CODES,
 } from './key-maps.js';
 import { DEFAULT_CONTROLLER_CSS } from '../styles/controller-css-defaults.js';
 
@@ -117,5 +118,6 @@ meet.google.com`.replace(regStrip, ''),
   window.VSC.Constants.KEYCODE_TO_CODE = KEYCODE_TO_CODE;
   window.VSC.Constants.displayKeyFromCode = displayKeyFromCode;
   window.VSC.Constants.BLACKLISTED_CODES = BLACKLISTED_CODES;
+  window.VSC.Constants.MODIFIER_CODES = MODIFIER_CODES;
   window.VSC.Constants.PREDEFINED_ACTIONS = PREDEFINED_ACTIONS;
 }

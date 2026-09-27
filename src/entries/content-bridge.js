@@ -245,6 +245,8 @@ function init() {
         chrome.runtime.sendMessage({
           type: 'VSC_FORWARD_KEY',
           key: {
+            type: key.type === 'keyup' ? 'keyup' : 'keydown',
+            repeat: !!key.repeat,
             code: key.code,
             key: typeof key.key === 'string' ? key.key : '',
             keyCode: typeof key.keyCode === 'number' ? key.keyCode : 0,

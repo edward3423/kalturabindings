@@ -172,6 +172,34 @@ export default async function runCrossFrameE2ETests() {
       assert.equal(state.rate, 3, 'iframe video rate should be 3x');
     });
     await runTest(
+      'Holding Shift on the host page runs 8x in the iframe, release restores',
+      async () => {
+        const frame = getFrame(page);
+        await page.evaluate(() => document.body.focus());
+        await page.keyboard.press('KeyW');
+        await sleep(400);
+        assert.equal((await videoState(frame)).rate, 2, 'starting speed should be 2x');
+        await page.keyboard.down('ShiftLeft');
+        await sleep(500);
+        assert.equal((await videoState(frame)).rate, 8, 'rate should be 8x while Shift is held');
+        await page.keyboard.up('ShiftLeft');
+        await sleep(500);
+        assert.equal((await videoState(frame)).rate, 2, 'rate should return to 2x on release');
+      }
+    );
+
+    await runTest('Holding Shift with focus inside the iframe', async () => {
+      const frame = getFrame(page);
+      await frame.evaluate(() => document.body.focus());
+      await page.keyboard.down('ShiftLeft');
+      await sleep(500);
+      assert.equal((await videoState(frame)).rate, 8, 'rate should be 8x while Shift is held');
+      await page.keyboard.up('ShiftLeft');
+      await sleep(500);
+      assert.equal((await videoState(frame)).rate, 2, 'rate should return to 2x on release');
+    });
+
+    await runTest(
       'Blank iframe written by the parent (Kaltura V2 style) gets a controller',
       async () => {
         await page.evaluate(() => {

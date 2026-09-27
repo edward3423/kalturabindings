@@ -47,6 +47,7 @@ function setupEnv({ withMedia = true, keyBindings } = {}) {
 
 function makeEvent(overrides = {}) {
   return {
+    repeat: overrides.repeat || false,
     stopImmediatePropagation: overrides.stopImmediatePropagation || (() => {}),
     code: overrides.code || '',
     key: overrides.key || '',
@@ -57,7 +58,7 @@ function makeEvent(overrides = {}) {
     metaKey: overrides.metaKey || false,
     isComposing: false,
     timeStamp: overrides.timeStamp || Date.now(),
-    type: 'keydown',
+    type: overrides.type || 'keydown',
     target: overrides.target || document.body,
     preventDefault: overrides.preventDefault || (() => {}),
     stopPropagation: overrides.stopPropagation || (() => {}),
@@ -131,6 +132,8 @@ describe('EventManager fork additions', () => {
     expect(actions).toEqual([]);
     expect(forwarded).toEqual([
       {
+        type: 'keydown',
+        repeat: false,
         code: 'KeyW',
         key: 'w',
         keyCode: 87,
@@ -244,5 +247,121 @@ describe('EventManager fork additions', () => {
     expect(eventManager.handleForwardedKey(null)).toBe(false);
     expect(eventManager.handleForwardedKey('KeyE')).toBe(false);
     expect(actions).toEqual([]);
+  });
+
+  describe('hold action', () => {
+    function holdEnv(opts = {}) {
+      const env = setupEnv(opts);
+      // Real adjustSpeed semantics are not needed: track writes per video.
+      env.actionHandler = env.eventManager.actionHandler;
+      env.actionHandler.createAuthorityBatch = () => ({ hasClaimedAuthority: false });
+      env.actionHandler.adjustSpeed = (video, value) =>
+        env.actions.push({ action: 'restore', value });
+      return env;
+    }
+
+    it('ships Shift (both sides) as an 8x hold by default', () => {
+      const holds = window.VSC.Constants.DEFAULT_SETTINGS.keyBindings.filter(
+        (b) => b.action === 'hold'
+      );
+      expect(holds.map((b) => [b.code, b.value])).toEqual([
+        ['ShiftLeft', 8],
+        ['ShiftRight', 8],
+      ]);
+    });
+
+    it('applies the hold speed on keydown and restores the previous speed on keyup', () => {
+      const { eventManager, actions } = holdEnv();
+      const video = window.VSC.stateManager.getControlledElements()[0];
+      video.playbackRate = 1.5;
+
+      eventManager.handleKeydown(makeEvent({ code: 'ShiftLeft', keyCode: 16, shiftKey: true }));
+      expect(actions).toEqual([{ action: 'speed', value: 8 }]);
+      expect(eventManager.hold).not.toBeNull();
+
+      eventManager.handleKeyup(makeEvent({ type: 'keyup', code: 'ShiftLeft', keyCode: 16 }));
+      expect(actions).toEqual([
+        { action: 'speed', value: 8 },
+        { action: 'restore', value: 1.5 },
+      ]);
+      expect(eventManager.hold).toBeNull();
+    });
+
+    it('ignores auto-repeat keydowns and a second press while holding', () => {
+      const { eventManager, actions } = holdEnv();
+      eventManager.handleKeydown(makeEvent({ code: 'ShiftLeft', keyCode: 16, timeStamp: 1 }));
+      eventManager.handleKeydown(
+        makeEvent({ code: 'ShiftLeft', keyCode: 16, repeat: true, timeStamp: 2 })
+      );
+      eventManager.handleKeydown(makeEvent({ code: 'ShiftRight', keyCode: 16, timeStamp: 3 }));
+      expect(actions).toEqual([{ action: 'speed', value: 8 }]);
+    });
+
+    it('does not claim the modifier keydown even with exclusive keys on', () => {
+      const { config, eventManager } = holdEnv();
+      config.settings.exclusiveKeys = true;
+      let prevented = false;
+      eventManager.handleKeydown(
+        makeEvent({ code: 'ShiftLeft', keyCode: 16, preventDefault: () => (prevented = true) })
+      );
+      expect(prevented).toBe(false);
+    });
+
+    it('restores on window blur and on cleanup', () => {
+      const { eventManager, actions } = holdEnv();
+      eventManager.handleKeydown(makeEvent({ code: 'ShiftLeft', keyCode: 16 }));
+      eventManager.endHold();
+      expect(actions.at(-1)).toEqual({ action: 'restore', value: 1 });
+      eventManager.handleKeydown(makeEvent({ code: 'ShiftLeft', keyCode: 16, timeStamp: 9 }));
+      eventManager.cleanup();
+      expect(actions.at(-1)).toEqual({ action: 'restore', value: 1 });
+      expect(eventManager.hold).toBeNull();
+    });
+
+    it('forwards hold keydown and keyup when this frame controls no media', () => {
+      const { eventManager } = holdEnv({ withMedia: false });
+      const forwarded = [];
+      const listener = (e) => forwarded.push([e.detail.type, e.detail.code]);
+      document.documentElement.addEventListener('VSC_FORWARD_KEY', listener);
+      eventManager.handleKeydown(makeEvent({ code: 'ShiftLeft', keyCode: 16, timeStamp: 1 }));
+      eventManager.handleKeydown(
+        makeEvent({ code: 'ShiftLeft', keyCode: 16, repeat: true, timeStamp: 2 })
+      );
+      eventManager.handleKeyup(makeEvent({ type: 'keyup', code: 'ShiftLeft', keyCode: 16 }));
+      document.documentElement.removeEventListener('VSC_FORWARD_KEY', listener);
+      expect(forwarded).toEqual([
+        ['keydown', 'ShiftLeft'],
+        ['keyup', 'ShiftLeft'],
+      ]);
+    });
+
+    it('applies forwarded hold keydown and keyup in the frame with media', () => {
+      const { eventManager, actions } = holdEnv();
+      const video = window.VSC.stateManager.getControlledElements()[0];
+      video.playbackRate = 2;
+      expect(
+        eventManager.handleForwardedKey({
+          type: 'keydown',
+          repeat: false,
+          code: 'ShiftLeft',
+          keyCode: 16,
+        })
+      ).toBe(true);
+      expect(
+        eventManager.handleForwardedKey({
+          type: 'keydown',
+          repeat: true,
+          code: 'ShiftLeft',
+          keyCode: 16,
+        })
+      ).toBe(false);
+      expect(
+        eventManager.handleForwardedKey({ type: 'keyup', code: 'ShiftLeft', keyCode: 16 })
+      ).toBe(true);
+      expect(actions).toEqual([
+        { action: 'speed', value: 8 },
+        { action: 'restore', value: 2 },
+      ]);
+    });
   });
 });

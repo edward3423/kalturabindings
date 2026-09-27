@@ -112,6 +112,11 @@ class ActionHandler {
         window.VSC.DragHandler.handleDrag(video, e);
         break;
 
+      case 'hold':
+        // Press/release lifecycle lives in EventManager.beginHold/endHold.
+        window.VSC.logger.debug('Hold action is handled by the event manager');
+        break;
+
       case 'speed':
         window.VSC.logger.debug('Set speed to:', value);
         this.adjustSpeed(video, value, { authorityBatch: options.authorityBatch });
