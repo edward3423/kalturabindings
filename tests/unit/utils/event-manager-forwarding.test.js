@@ -47,6 +47,7 @@ function setupEnv({ withMedia = true, keyBindings } = {}) {
 
 function makeEvent(overrides = {}) {
   return {
+    stopImmediatePropagation: overrides.stopImmediatePropagation || (() => {}),
     code: overrides.code || '',
     key: overrides.key || '',
     keyCode: overrides.keyCode || 0,
@@ -59,7 +60,7 @@ function makeEvent(overrides = {}) {
     type: 'keydown',
     target: overrides.target || document.body,
     preventDefault: overrides.preventDefault || (() => {}),
-    stopPropagation: () => {},
+    stopPropagation: overrides.stopPropagation || (() => {}),
   };
 }
 
@@ -175,6 +176,45 @@ describe('EventManager fork additions', () => {
     );
     config.settings.exclusiveKeys = false;
     expect(prevented).toBe(true);
+  });
+
+  it('exclusive keys are on by default and claim the event before other listeners', () => {
+    expect(window.VSC.Constants.DEFAULT_SETTINGS.exclusiveKeys).toBe(true);
+    const { config, eventManager, actions } = setupEnv();
+    config.settings.exclusiveKeys = true;
+    const calls = [];
+    eventManager.handleKeydown(
+      makeEvent({
+        code: 'KeyK',
+        keyCode: 75,
+        preventDefault: () => calls.push('preventDefault'),
+        stopImmediatePropagation: () => calls.push('stopImmediatePropagation'),
+        stopPropagation: () => calls.push('stopPropagation'),
+      })
+    );
+    expect(actions).toEqual([{ action: 'pause', value: 0 }]);
+    expect(calls).toEqual(['preventDefault', 'stopImmediatePropagation', 'stopPropagation']);
+  });
+
+  it('registers key listeners on the window capture phase, ahead of document listeners', () => {
+    const { eventManager, actions } = setupEnv();
+    const order = [];
+    const docListener = () => order.push('document');
+    document.addEventListener('keydown', docListener, true);
+    eventManager.setupKeyboardShortcuts(document);
+    const event = new KeyboardEvent('keydown', {
+      code: 'KeyW',
+      keyCode: 87,
+      bubbles: true,
+      cancelable: true,
+    });
+    document.body.dispatchEvent(event);
+    document.removeEventListener('keydown', docListener, true);
+    eventManager.cleanup();
+    expect(actions).toEqual([{ action: 'speed', value: 2 }]);
+    expect(event.defaultPrevented).toBe(true);
+    // Document-capture listener registered earlier never saw the claimed key
+    expect(order).toEqual([]);
   });
 
   it('applies a forwarded shortcut when this frame controls media', () => {

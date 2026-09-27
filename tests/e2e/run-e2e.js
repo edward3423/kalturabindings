@@ -2,7 +2,7 @@
 
 /**
  * E2E test runner for Video Speed Controller Chrome Extension
- * Usage: node tests/e2e/run-e2e.js [youtube|basic|settings|display|arbitration|lifecycle|crossframe|all]
+ * Usage: node tests/e2e/run-e2e.js [youtube|basic|settings|display|arbitration|lifecycle|crossframe|kaltura|all]
  */
 
 import { pathToFileURL, fileURLToPath } from 'url';
@@ -45,6 +45,9 @@ async function runE2ETests() {
     testFiles = ['lifecycle.e2e.js'];
   } else if (testType === 'crossframe') {
     testFiles = ['cross-frame.e2e.js'];
+  } else if (testType === 'kaltura') {
+    // Network-dependent (public Kaltura sample player); not part of "all".
+    testFiles = ['kaltura.e2e.js'];
   } else {
     // Run all tests
     testFiles = [

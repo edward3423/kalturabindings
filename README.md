@@ -56,6 +56,12 @@ This is a fork of [igrigorik/videospeed][github-release-link] with two changes:
   you first click inside the player. This fork forwards a matching shortcut
   from any frame of the tab to the frames that control media, so keys work no
   matter where focus is. The overlay controller is unchanged.
+- **Shortcuts win over the player's own keys.** Key listeners run in the
+  window capture phase and "Exclusive keyboard shortcuts" is on by default,
+  so a key bound in this extension is not also handled by the page. Without
+  this, Kaltura's own K handler toggles play and ours toggles it straight
+  back. Turn the option off in settings if you want the page to see the
+  keys too.
 - **Extra default shortcuts**, added as custom rows on the settings page:
 
   | Key | Action             |
@@ -85,7 +91,8 @@ Then open `chrome://extensions`, enable Developer mode, choose "Load
 unpacked" and select the `dist` folder. Note that recent branded Chrome
 builds ignore the `--load-extension` flag, so the E2E suite needs Chrome for
 Testing (`npx puppeteer browsers install chrome@stable`) and
-`PUPPETEER_EXECUTABLE_PATH` pointing at it.
+`PUPPETEER_EXECUTABLE_PATH` pointing at it. `node tests/e2e/run-e2e.js kaltura`
+runs an extra suite against a public Kaltura sample player (needs network).
 
 ## Default keyboard shortcuts
 

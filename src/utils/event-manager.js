@@ -48,18 +48,23 @@ class EventManager {
     }
 
     docs.forEach((doc) => {
+      // Listen on the window, not the document: window capture runs before
+      // every document-level listener regardless of registration order, so
+      // exclusiveKeys can really stop a page's own document-capture handler
+      // (Kaltura binds K there and would otherwise toggle play twice).
+      const target = doc.defaultView || doc;
       const keydownHandler = (event) => this.handleKeydown(event);
       const keyupHandler = (event) => this.handleKeyup(event);
-      doc.addEventListener('keydown', keydownHandler, true);
-      doc.addEventListener('keyup', keyupHandler, true);
+      target.addEventListener('keydown', keydownHandler, true);
+      target.addEventListener('keyup', keyupHandler, true);
 
       // Store references for cleanup. Keyup only retires the short-lived
       // YouTube Space-hold signature; it never handles VSC shortcuts.
-      if (!this.listeners.has(doc)) {
-        this.listeners.set(doc, []);
+      if (!this.listeners.has(target)) {
+        this.listeners.set(target, []);
       }
       this.listeners
-        .get(doc)
+        .get(target)
         .push(
           { type: 'keydown', handler: keydownHandler, useCapture: true },
           { type: 'keyup', handler: keyupHandler, useCapture: true }
@@ -117,8 +122,7 @@ class EventManager {
       if (keyBinding) {
         this.forwardKey(event);
         if (this.config.settings.exclusiveKeys) {
-          event.preventDefault();
-          event.stopPropagation();
+          EventManager.claimEvent(event);
         }
       }
       return false;
@@ -128,8 +132,7 @@ class EventManager {
       this.actionHandler.runAction(keyBinding.action, keyBinding.value, event);
 
       if (this.config.settings.exclusiveKeys) {
-        event.preventDefault();
-        event.stopPropagation();
+        EventManager.claimEvent(event);
       }
     } else {
       // Unhandled key — possibly a native site shortcut. Whether it counts
@@ -548,6 +551,19 @@ class EventManager {
  */
 EventManager.modifiersMatch = function (mods, ctrl, alt, meta, shift) {
   return mods.ctrl === ctrl && mods.alt === alt && mods.meta === meta && mods.shift === shift;
+};
+
+/**
+ * Keep a handled shortcut away from the page: no default action, no other
+ * listener on this target, no further propagation.
+ * @param {KeyboardEvent} event
+ */
+EventManager.claimEvent = function (event) {
+  event.preventDefault();
+  if (typeof event.stopImmediatePropagation === 'function') {
+    event.stopImmediatePropagation();
+  }
+  event.stopPropagation();
 };
 
 /**
