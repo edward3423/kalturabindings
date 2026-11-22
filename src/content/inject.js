@@ -228,10 +228,12 @@ class VideoSpeedExtension {
     // marker on later selectors — it would survive preprocessing as a
     // dead selector and re-introduce the [style*=...] invalidation hazard
     // the wrapping exists to remove (#1501).
+    // Extra leading :root compounds (":root:root[marker]", a specificity
+    // bump) belong to the rule: kept on a match, removed with it otherwise.
     return css.replace(
-      /:root\[style\*='--vsc-domain:\s*"([^"]+)"'\]([^{]*)\{([^}]*)\}/g,
-      (match, domain, selector, body) =>
-        domain === normalizedHostname ? `${selector.trim()} {${body}}` : ''
+      /((?::root)*):root\[style\*='--vsc-domain:\s*"([^"]+)"'\]([^{]*)\{([^}]*)\}/g,
+      (match, rootBump, domain, selector, body) =>
+        domain === normalizedHostname ? `${(rootBump + selector).trim()} {${body}}` : ''
     );
   }
 
@@ -241,7 +243,8 @@ class VideoSpeedExtension {
    * sites with complex frameworks, breaking their internal state.
    *
    * Two separate sheets: _controllerSheet (built-in defaults, domain-
-   * preprocessed, never changes at runtime) and _customSheet (user
+   * preprocessed, plus the site handler's getControllerCSS(); never changes
+   * at runtime) and _customSheet (user
    * additions, injected raw, live-updatable). Keeps them separate so
    * user CSS edits don't re-preprocess the defaults.
    */
@@ -251,8 +254,13 @@ class VideoSpeedExtension {
         return;
       }
       this._controllerSheet = new CSSStyleSheet();
+      const siteCSS = this.siteHandlerManager.getControllerCSS();
       this._controllerSheet.replaceSync(
-        this.preprocessDomainCSS(window.VSC.Constants.DEFAULT_CONTROLLER_CSS)
+        this.preprocessDomainCSS(window.VSC.Constants.DEFAULT_CONTROLLER_CSS) +
+          (siteCSS
+            ? `
+${siteCSS}`
+            : '')
       );
       const toAdopt = [this._controllerSheet];
 

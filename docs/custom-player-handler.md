@@ -139,6 +139,20 @@ getControllerPosition(parent, _video) {
 
 Override this when a site's player has overlays or stacking contexts that would cover the default position.
 
+#### `getControllerCSS()`
+
+Returns extra controller CSS for this site, appended to the built-in defaults (so the user's custom CSS still overrides it). Use it instead of a `--vsc-domain` rule in `controller-css-defaults.js` when the site has no fixed hostname, such as a self-hosted app detected from its DOM in `matches()`.
+
+```js
+getControllerCSS() {
+  return `.videoPlayerContainer ~ vsc-controller {
+  top: 48px;
+}`;
+}
+```
+
+See `jellyfin-handler.js` for a complete example.
+
 ### Playback
 
 These are the core operations. Each method **owns** the operation entirely -- the base class provides the default implementation, and your override replaces it completely.
@@ -148,6 +162,7 @@ These are the core operations. Each method **owns** the operation entirely -- th
 Called whenever the extension sets playback speed. This includes user-initiated speed changes, programmatic changes, and fight-back speed restoration.
 
 **Default behavior:**
+
 ```js
 handleSpeedChange(video, speed) {
   video.playbackRate = speed;
@@ -170,12 +185,12 @@ handleSpeedChange(video, speed) {
 
 **When is this called?**
 
-| Scenario | Example |
-|---|---|
-| User changes speed | Keyboard shortcut, popup slider |
-| Extension restores speed | Page load with "remember speed" enabled |
-| Fight-back | Site tried to reset speed, extension restores it |
-| Cooldown restore | Site changed speed during cooldown window |
+| Scenario                 | Example                                          |
+| ------------------------ | ------------------------------------------------ |
+| User changes speed       | Keyboard shortcut, popup slider                  |
+| Extension restores speed | Page load with "remember speed" enabled          |
+| Fight-back               | Site tried to reset speed, extension restores it |
+| Cooldown restore         | Site changed speed during cooldown window        |
 
 All paths go through `handleSpeedChange`. There are no direct `video.playbackRate` assignments in the extension's core.
 
@@ -184,6 +199,7 @@ All paths go through `handleSpeedChange`. There are no direct `video.playbackRat
 Called when the user seeks forward or backward. The `seekSeconds` value is negative for rewind.
 
 **Default behavior:**
+
 ```js
 handleSeek(video, seekSeconds) {
   const newTime = Math.max(0, Math.min(video.duration, video.currentTime + seekSeconds));
@@ -232,13 +248,13 @@ When a site externally changes `video.playbackRate` (e.g., the site's own speed 
 
 ## Existing handlers
 
-| Handler | Site | Key overrides |
-|---|---|---|
-| `YouTubeHandler` | youtube.com | Controller positioning, autohide CSS forwarding, video filtering |
-| `NetflixHandler` | netflix.com | Controller positioning, custom seeking via postMessage |
-| `FacebookHandler` | facebook.com | Controller positioning, dynamic content observer |
-| `AmazonHandler` | amazon.com, primevideo.com | Controller positioning, size-based video filtering |
-| `AppleHandler` | tv.apple.com | Controller positioning, shadow DOM video detection |
+| Handler           | Site                       | Key overrides                                                    |
+| ----------------- | -------------------------- | ---------------------------------------------------------------- |
+| `YouTubeHandler`  | youtube.com                | Controller positioning, autohide CSS forwarding, video filtering |
+| `NetflixHandler`  | netflix.com                | Controller positioning, custom seeking via postMessage           |
+| `FacebookHandler` | facebook.com               | Controller positioning, dynamic content observer                 |
+| `AmazonHandler`   | amazon.com, primevideo.com | Controller positioning, size-based video filtering               |
+| `AppleHandler`    | tv.apple.com               | Controller positioning, shadow DOM video detection               |
 
 ## Testing
 

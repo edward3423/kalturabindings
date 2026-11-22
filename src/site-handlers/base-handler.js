@@ -32,6 +32,17 @@ class BaseSiteHandler {
   }
 
   /**
+   * Extra controller CSS for this site, appended to the built-in defaults
+   * (so the user's custom CSS still overrides it). Use this instead of a
+   * --vsc-domain rule when the site has no fixed hostname, e.g. self-hosted
+   * apps detected from their DOM in matches().
+   * @returns {string} CSS text, or '' for none
+   */
+  getControllerCSS() {
+    return '';
+  }
+
+  /**
    * Declare site-specific intent-classifier rule activations.
    *
    * The classifier owns what each flag MEANS (signature rates, binding,

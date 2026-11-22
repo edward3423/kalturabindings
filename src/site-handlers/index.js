@@ -15,6 +15,7 @@ class SiteHandlerManager {
       window.VSC.AppleHandler,
       window.VSC.DailymotionHandler,
       window.VSC.FrameHandler,
+      window.VSC.JellyfinHandler,
     ];
   }
 
@@ -64,6 +65,14 @@ class SiteHandlerManager {
   getControllerPosition(parent, video) {
     const handler = this.getCurrentHandler();
     return handler.getControllerPosition(parent, video);
+  }
+
+  /**
+   * Get extra controller CSS for current site
+   * @returns {string} CSS text, or '' for none
+   */
+  getControllerCSS() {
+    return this.getCurrentHandler().getControllerCSS();
   }
 
   /**

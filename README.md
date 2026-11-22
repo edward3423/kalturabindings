@@ -67,6 +67,11 @@ This is a fork of [igrigorik/videospeed][github-release-link] with two changes:
   this, Kaltura's own K handler toggles play and ours toggles it straight
   back. Turn the option off in settings if you want the page to see the
   keys too.
+- **Works in Jellyfin.** Jellyfin is self-hosted, so it is recognized from
+  its `application-name` meta tag rather than a hostname. All shortcuts
+  win over Jellyfin's own K, J, L and M keys. The controller sits below the
+  player's title bar instead of hidden behind its back button, and stays
+  clickable while Jellyfin's controls are shown.
 - **Extra default shortcuts**, added as custom rows on the settings page:
 
   | Key          | Action                                   |
@@ -101,7 +106,11 @@ unpacked" and select the `dist` folder. Note that recent branded Chrome
 builds ignore the `--load-extension` flag, so the E2E suite needs Chrome for
 Testing (`npx puppeteer browsers install chrome@stable`) and
 `PUPPETEER_EXECUTABLE_PATH` pointing at it. `node tests/e2e/run-e2e.js kaltura`
-runs an extra suite against a public Kaltura sample player (needs network).
+runs an extra suite against a public Kaltura sample player, and
+`node tests/e2e/run-e2e.js jellyfin` one against the public Jellyfin demo
+server (both need network; set `JELLYFIN_URL`, `JELLYFIN_USER` and
+`JELLYFIN_PASSWORD` to test your own server). Test browsers run with audio
+muted.
 
 ## Default keyboard shortcuts
 

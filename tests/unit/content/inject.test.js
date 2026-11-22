@@ -317,6 +317,29 @@ describe('Inject', () => {
     expect(document.adoptedStyleSheets).toContain(extension._customSheet);
   });
 
+  it('injectControllerCSS appends the site handler CSS to the default sheet', () => {
+    extension = window.VSC_controller;
+    resetCSSState(extension);
+    extension.config.settings.customCSS = 'vsc-controller { top: 42px; }';
+    const siteCSS = vi
+      .spyOn(window.VSC.siteHandlerManager, 'getControllerCSS')
+      .mockReturnValue('.site-player > vsc-controller { top: 48px; }');
+
+    try {
+      extension.injectControllerCSS();
+
+      const defaults = Array.from(extension._controllerSheet.cssRules).map((r) => r.cssText);
+      expect(defaults.some((t) => t.startsWith('.site-player > vsc-controller'))).toBe(true);
+      // User CSS stays last so it can still override the site rule.
+      const sheets = document.adoptedStyleSheets;
+      expect(sheets.indexOf(extension._customSheet)).toBeGreaterThan(
+        sheets.indexOf(extension._controllerSheet)
+      );
+    } finally {
+      siteCSS.mockRestore();
+    }
+  });
+
   it('injectControllerCSS skips custom sheet when customCSS is empty', () => {
     extension = window.VSC_controller;
     resetCSSState(extension);

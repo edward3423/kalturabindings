@@ -129,6 +129,22 @@ describe('ControllerCSS', () => {
       expect(out.includes('top: 2px')).toBe(true);
     });
 
+    it('keeps a :root specificity bump on the matching domain as a valid selector', () => {
+      const css = `:root${wrap('localhost', 'vsc-controller')} { top: 0px; }`;
+      expect(preprocess(css).trim()).toBe(':root vsc-controller { top: 0px; }');
+    });
+
+    it('removes a :root specificity bump together with its off-domain rule', () => {
+      // A stray ":root" left at the end of the sheet would prefix whatever
+      // CSS is appended after it (site handler CSS), changing its selector.
+      const css = `.x vsc-controller { top: 1px; }\n:root${wrap('other.com', 'vsc-controller')} { top: 0px; }`;
+      expect(preprocess(css).trim()).toBe('.x vsc-controller { top: 1px; }');
+      const shipped = preprocess(window.VSC.Constants.DEFAULT_CONTROLLER_CSS)
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .trim();
+      expect(shipped.endsWith('}')).toBe(true);
+    });
+
     it('removes every domain marker and [style*] probe from the shipped defaults off-domain (#1501)', () => {
       const out = preprocess(window.VSC.Constants.DEFAULT_CONTROLLER_CSS);
       // Comments may mention the marker syntax; only live selector text
