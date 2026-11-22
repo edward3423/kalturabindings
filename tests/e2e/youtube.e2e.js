@@ -93,8 +93,9 @@ export default async function runYouTubeE2ETests() {
     });
 
     await runTest('Keyboard shortcuts should work on YouTube', async () => {
-      // Reset first using keyboard (R key)
-      await testKeyboardShortcut(page, 'KeyR');
+      // Back to 1x first. In this fork R sets 4x (a custom row that wins
+      // over the built-in reset), and Q sets 1x.
+      await testKeyboardShortcut(page, 'KeyQ');
       await sleep(1000);
 
       // Test keyboard shortcuts

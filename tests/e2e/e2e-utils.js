@@ -35,6 +35,9 @@ export async function launchChromeWithExtension() {
         ...(process.env.CHROME_NO_SANDBOX ? ['--no-sandbox'] : []),
         `--load-extension=${extensionPath}`,
         `--disable-extensions-except=${extensionPath}`,
+        // Silence test playback. This mutes the browser's audio output only;
+        // HTMLMediaElement.muted is unaffected, so mute tests still work.
+        '--mute-audio',
         '--disable-dev-shm-usage',
         '--disable-gpu',
         '--disable-features=TranslateUI',
